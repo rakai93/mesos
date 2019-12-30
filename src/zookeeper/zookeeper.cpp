@@ -32,6 +32,7 @@
 
 #include <stout/duration.hpp>
 #include <stout/foreach.hpp>
+#include <stout/option.hpp>
 #include <stout/os.hpp>
 #include <stout/path.hpp>
 #include <stout/strings.hpp>
@@ -103,14 +104,49 @@ public:
     // timeout in `GroupProcess`. See MESOS-4546 for more information.
     const Timeout initLoopTimeout = Timeout::in(Minutes(10));
 
+    bool zk_ssl = false;
+#ifdef HAVE_OPENSSL_H
+    Option<string> value = os::getenv("ZK_SSL_ENABLED");
+    string zk_cert;
+    if (value.isSome() && (value.get() == "1" || value.get() == "true")) {
+      zk_ssl = true;
+      Option<string> zk_server_cert = os::getenv("ZK_SSL_CA_FILE");
+      Option<string> zk_client_cert = os::getenv("ZK_SSL_CLIENT_CERT_FILE");
+      Option<string> zk_client_key = os::getenv("ZK_SSL_CLIENT_KEY_FILE");
+      Option<string> zk_client_key_password = os::getenv(
+        "ZK_SSL_CLIENT_KEY_PASSWORD"
+      );
+      zk_cert = (
+        zk_server_cert.getOrElse("") + "," +
+        zk_client_cert.getOrElse("") + "," +
+        zk_client_key.getOrElse("") + "," +
+        zk_client_key_password.getOrElse("")
+      );
+    }
+#endif
+
     while (!initLoopTimeout.expired()) {
-      zh = zookeeper_init(
-          servers.c_str(),
-          event,
-          static_cast<int>(sessionTimeout.ms()),
-          nullptr,
-          &callback,
-          0);
+      if (zk_ssl) {
+#ifdef HAVE_OPENSSL_H
+        zh = zookeeper_init_ssl(
+            servers.c_str(),
+            zk_cert.c_str(),
+            event,
+            static_cast<int>(sessionTimeout.ms()),
+            nullptr,
+            &callback,
+            0);
+#endif
+      }
+      else {
+        zh = zookeeper_init(
+            servers.c_str(),
+            event,
+            static_cast<int>(sessionTimeout.ms()),
+            nullptr,
+            &callback,
+            0);
+      }
 
       // Unfortunately, EINVAL is highly overloaded in zookeeper_init
       // and can correspond to:

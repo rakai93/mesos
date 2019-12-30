@@ -2351,7 +2351,9 @@ if test "x$without_bundled_zookeeper" = "xyes" || \
   AC_CHECK_HEADERS([zookeeper.h],
                    [AC_CHECK_LIB([zookeeper_mt],
                                  [zookeeper_init],
-                                 [found_zookeeper=yes])])
+                                 [found_zookeeper=yes],
+                                 [],
+                                 [-lpthread])])
 
   if test "x$found_zookeeper" = "xyes"; then
     with_bundled_zookeeper=no
@@ -2369,6 +2371,16 @@ correct if you're already doing this
   fi
 else
   with_bundled_zookeeper=yes
+fi
+
+AC_CHECK_LIB([zookeeper_mt],
+             [zookeeper_init_ssl],
+             [zookeeper_has_ssl=yes],
+             [],
+             [-lpthread])
+
+if test "x$zookeeper_has_ssl" = "xyes"; then
+  AC_DEFINE(HAVE_OPENSSL_H)
 fi
 
 
